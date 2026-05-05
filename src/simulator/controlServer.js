@@ -14,6 +14,16 @@ function startControlServer({ sensorsByKey, sensorsBySector, getSimTime }) {
   const app = express();
   app.use(express.json());
 
+  // CORS aberto: o dashboard servido em :4001 precisa chamar este servico (:4000)
+  // pra injetar/limpar falhas. So expomos endpoints de teste, sem dado sensivel.
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+
   // ------------ GET /health ------------
   app.get('/health', (_req, res) => {
     res.json({ ok: true, ts: new Date().toISOString() });

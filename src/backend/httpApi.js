@@ -160,6 +160,16 @@ function buildRouter() {
   );
 
   // ============================================================
+  // Saude dos gateways (alimenta as bolinhas do dashboard)
+  // ============================================================
+  router.get(
+    '/gateways',
+    asyncHandler(async (_req, res) => {
+      res.json({ gateways: await db.getGatewayStatuses() });
+    })
+  );
+
+  // ============================================================
   // ETAPA 6 - Incidentes (router pre-existente)
   // ============================================================
   router.use('/', incidentRouter);
@@ -169,7 +179,12 @@ function buildRouter() {
 
 function startHttpApi(port = config.apiPort) {
   const app = express();
+  const path = require('path');
   app.use(express.json());
+
+  // Dashboard estatico (light mode, sem build) servido em /
+  app.use(express.static(path.join(__dirname, '..', '..', 'public')));
+
   app.use('/api/v1', buildRouter());
 
   app.get('/health', (_req, res) =>
@@ -184,6 +199,7 @@ function startHttpApi(port = config.apiPort) {
 
   app.listen(port, () => {
     console.log(`[api] HTTP ouvindo em http://localhost:${port}`);
+    console.log(`[api]   Dashboard: http://localhost:${port}/`);
     console.log(`[api]   GET /api/v1/map`);
     console.log(`[api]   GET /api/v1/sectors`);
     console.log(`[api]   GET /api/v1/sectors/:id/spots`);

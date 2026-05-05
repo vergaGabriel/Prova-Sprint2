@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Estacionamento Inteligente — Sprint 2</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="title">Estacionamento Inteligente</span>
+      <span class="subtitle">Sprint 2 — IoT</span>
+    </div>
+    <div class="topbar-right">
+      <span class="health" id="health" data-state="unknown">
+        <span class="health-icon" id="health-icon"></span>
+        <span class="health-label" id="health-label">Conectando...</span>
+      </span>
+      <span class="gateways" id="gateways"></span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="sectors-root" class="sectors-grid"></section>
+
+    <section class="card">
+      <header class="card-header">
+        <h2 class="card-title">Mapa de vagas</h2>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot legend-dot--free"></span>livre</span>
+          <span class="legend-item"><span class="legend-dot legend-dot--occupied"></span>ocupada</span>
+          <span class="legend-item"><span class="legend-dot legend-dot--incident"></span>incidente</span>
+          <span class="legend-item"><span class="legend-dot legend-dot--unknown"></span>desconhecida</span>
+        </div>
+      </header>
+      <div id="map-root" class="map-grid"></div>
+    </section>
+
+    <section id="recommendation-root" class="recommendation hidden"></section>
+
+    <section class="card">
+      <header class="card-header">
+        <h2 class="card-title" id="incidents-title">Incidentes abertos</h2>
+      </header>
+      <div id="incidents-root" class="incidents-list"></div>
+    </section>
+
+    <section class="card">
+      <header class="card-header">
+        <h2 class="card-title">Controle de simulação</h2>
+        <span class="card-subtitle">Injeta falhas no simulador (porta 4000)</span>
+      </header>
+      <div id="controls-root"></div>
+    </section>
+  </main>
+
+  <div id="tooltip" class="tooltip"></div>
+  <div id="toasts" class="toasts"></div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

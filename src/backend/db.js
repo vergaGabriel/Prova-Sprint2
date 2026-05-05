@@ -83,6 +83,20 @@ async function saveGatewayStatus(payload) {
   return true;
 }
 
+async function getGatewayStatuses() {
+  const r = await pool.query(
+    `SELECT sector_id, status, payload, received_at
+     FROM gateway_status
+     ORDER BY sector_id`
+  );
+  return r.rows.map((row) => ({
+    sectorId: row.sector_id,
+    status: row.status,
+    payload: row.payload,
+    receivedAt: row.received_at ? row.received_at.toISOString() : null,
+  }));
+}
+
 // =====================================================================
 // LEITURA — mapa, setores, vagas (Etapa 4)
 // =====================================================================
@@ -325,6 +339,7 @@ module.exports = {
   getSectorOccupancy,
   getSectorSpots,
   getFreeSpots,
+  getGatewayStatuses,
   // Relatorios
   getTurnoverCount,
   // Recomendacoes
