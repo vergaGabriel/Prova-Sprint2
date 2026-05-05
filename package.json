@@ -1,0 +1,26 @@
+{
+  "name": "parking-iot",
+  "version": "0.2.0",
+  "description": "Estacionamento inteligente - Etapas 1 e 2 (Sprint 2 IoT)",
+  "main": "src/simulator/index.js",
+  "scripts": {
+    "start": "node src/simulator/index.js",
+    "sim": "node src/simulator/index.js",
+    "backend": "node src/backend/index.js"
+  },
+  "keywords": [
+    "iot",
+    "mqtt",
+    "parking",
+    "simulador"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mqtt": "^5.10.1",
+    "pg": "^8.20.0",
+    "uuid": "^10.0.0"
+  }
+}
