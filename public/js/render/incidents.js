@@ -1,43 +1,50 @@
 // public/js/render/incidents.js
-// Renderiza a lista de incidentes abertos. Atualiza tambem o titulo com a contagem.
-//
-// data: payload de GET /api/v1/incidents?status=open
-//       -> { total, incidents: [{ id, type, severity, sectorId, spotId, tsOpen, evidenceJson, ... }, ...] }
-//
-// Em vez de mostrar so o codigo cru (FLAPPING / STUCK_*), traduzimos pra texto
-// humano usando os campos do evidenceJson que o detector grava.
 
 function formatRelativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(diff / 1000);
-  if (sec < 60)    return `ha ${sec}s`;
+  if (sec < 60) return `ha ${sec}s`;
   const min = Math.floor(sec / 60);
-  if (min < 60)    return `ha ${min}min`;
+  if (min < 60) return `ha ${min}min`;
   const hr = Math.floor(min / 60);
-  if (hr < 24)     return `ha ${hr}h`;
+  if (hr < 24) return `ha ${hr}h`;
   const day = Math.floor(hr / 24);
   return `ha ${day}d`;
 }
 
-// Traduz codigo + evidence em texto curto e direto.
+function formatJanela(ms) {
+  if (!ms) return '?';
+
+  const min = Math.round(ms / 60000);
+
+  if (min < 60) return `${min}min`;
+
+  const horas = min / 60;
+  return `${Number.isInteger(horas) ? horas : horas.toFixed(1)}h`;
+}
+
 function describe(inc) {
   const ev = inc.evidenceJson || {};
+
   switch (inc.type) {
     case 'FLAPPING':
       return {
-        title:  'Sensor instavel (oscilando)',
-        detail: `${ev.trocasNaJanela ?? '?'} trocas em 60min — provavel ruido ou mau contato`,
+        title: 'Sensor instavel (oscilando)',
+        detail: `${ev.trocasNaJanela ?? '?'} trocas em ${formatJanela(ev.janelaMs)} — provavel ruido ou mau contato`,
       };
+
     case 'STUCK_OCCUPIED':
       return {
-        title:  'Travada em OCUPADA',
+        title: 'Travada em OCUPADA',
         detail: `sem mudar de estado ha ${ev.tempoSemMudarHoras ?? '?'}h — sensor pode estar com defeito`,
       };
+
     case 'STUCK_FREE':
       return {
-        title:  'Travada em LIVRE',
+        title: 'Travada em LIVRE',
         detail: `sem mudar de estado ha ${ev.tempoSemMudarHoras ?? '?'}h — sensor talvez sem reportar`,
       };
+
     default:
       return { title: inc.type, detail: '' };
   }
@@ -45,6 +52,7 @@ function describe(inc) {
 
 export function renderIncidents(data, listRoot, titleEl) {
   const total = data?.total ?? 0;
+
   if (titleEl) {
     titleEl.textContent = total > 0
       ? `Incidentes abertos (${total})`
@@ -59,6 +67,7 @@ export function renderIncidents(data, listRoot, titleEl) {
   listRoot.innerHTML = data.incidents
     .map((inc) => {
       const d = describe(inc);
+
       return `
         <div class="incident-row">
           <span class="incident-spot">${inc.spotId || inc.sectorId}</span>

@@ -18,29 +18,28 @@
 const incidentDb = require('./incidentDb');
 
 const TH = {
-  stuckMs:             8 * 60 * 60 * 1000, // 8h sim
-  flappingWindow:     60 * 60 * 1000,       // 1h sim
-  flappingMaxChanges: 6,                    // > 6 trocas na janela
+  stuckMs: 8 * 60 * 60 * 1000,
+  flappingWindow: 60 * 1000,
+  flappingMaxChanges: 6,
+  minStateDurationMs: 10 * 1000,
+  startupGraceMs: 30 * 1000,
 };
-
 class IncidentDetector {
   constructor() {
-    // Map: spotId -> { lastState, lastChangeTs, changesInWindow[] }
     this.historico = new Map();
+    this.startedAt = Date.now();
   }
 
-  /**
-   * Processa um evento ja validado/inserido. Async porque chama o DB.
-   */
   async processar(evt) {
     const { spotId, sectorId, state, ts } = evt;
     const agora = new Date(ts);
 
     if (!this.historico.has(spotId)) {
       this.historico.set(spotId, {
-        lastState:       state,
-        lastChangeTs:    agora,
+        lastState: state,
+        lastChangeTs: agora,
         changesInWindow: [],
+        totalChanges: 0,
       });
       return;
     }
@@ -49,50 +48,66 @@ class IncidentDetector {
     const mudou = state !== h.lastState;
 
     if (mudou) {
-      h.lastState    = state;
+      const estadoAnterior = h.lastState;
+      const ultimaMudancaAnterior = h.lastChangeTs;
+      const tempoNoEstadoAnteriorMs = agora - ultimaMudancaAnterior;
+
+      h.totalChanges += 1;
+
+      const emInicializacao =
+        Date.now() - this.startedAt <= TH.startupGraceMs;
+
+      const primeiraTroca = h.totalChanges === 1;
+
+      h.lastState = state;
       h.lastChangeTs = agora;
+
       h.changesInWindow.push(agora);
       h.changesInWindow = h.changesInWindow.filter(
         (t) => agora - t <= TH.flappingWindow
       );
 
-      // Vaga voltou a se mexer -> stuck pode ser fechado
       await this._fecharSeExistir(spotId, 'STUCK_OCCUPIED');
       await this._fecharSeExistir(spotId, 'STUCK_FREE');
 
-      if (h.changesInWindow.length > TH.flappingMaxChanges) {
+      const trocaRapidaDemais =
+        !emInicializacao &&
+        !primeiraTroca &&
+        estadoAnterior === 'OCCUPIED' &&
+        state === 'FREE' &&
+        tempoNoEstadoAnteriorMs <= TH.minStateDurationMs;
+
+      const muitasTrocasNaJanela =
+        !emInicializacao &&
+        h.changesInWindow.length > TH.flappingMaxChanges;
+
+      if (trocaRapidaDemais || muitasTrocasNaJanela) {
         await incidentDb.openIncident({
-          type:        'FLAPPING',
+          type: 'FLAPPING',
           sectorId,
           spotId,
           evidenceJson: {
+            motivo: trocaRapidaDemais
+              ? 'TROCA_RAPIDA_DEMAIS'
+              : 'MUITAS_TROCAS_NA_JANELA',
+            estadoAnterior,
+            estadoAtual: state,
+            tempoNoEstadoAnteriorMs,
+            tempoNoEstadoAnteriorSegundos: parseFloat(
+              (tempoNoEstadoAnteriorMs / 1000).toFixed(1)
+            ),
             trocasNaJanela: h.changesInWindow.length,
-            janelaMs:       TH.flappingWindow,
-            ultimaTrocaTs:  agora.toISOString(),
+            janelaMs: TH.flappingWindow,
+            startupGraceMs: TH.startupGraceMs,
+            ultimaTrocaTs: agora.toISOString(),
           },
         });
       } else {
         await this._fecharSeExistir(spotId, 'FLAPPING');
       }
-    } else {
-      const tempoSemMudarMs = agora - h.lastChangeTs;
-      if (tempoSemMudarMs >= TH.stuckMs) {
-        const tipo = state === 'OCCUPIED' ? 'STUCK_OCCUPIED' : 'STUCK_FREE';
-        await incidentDb.openIncident({
-          type:        tipo,
-          sectorId,
-          spotId,
-          evidenceJson: {
-            state,
-            tempoSemMudarMs,
-            tempoSemMudarHoras: parseFloat((tempoSemMudarMs / 3_600_000).toFixed(1)),
-            ultimaMudancaTs:    h.lastChangeTs.toISOString(),
-            eventoTs:           agora.toISOString(),
-          },
-        });
-      }
     }
   }
+
 
   async _fecharSeExistir(spotId, type) {
     const inc = await incidentDb.getOpenIncident(spotId, type);
