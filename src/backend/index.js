@@ -131,8 +131,9 @@ async function main() {
   // 2) Sobe HTTP API
   startHttpApi(config.apiPort);
 
-  // 3) Inicia job de snapshots por minuto
+  // 3) Inicia job de snapshots por minuto + scanner de STUCK
   startSnapshotter();
+  incidentDetector.startStuckScanner();
 
   // 4) Conecta no MQTT e subscreve
   const clientId = `backend-${config.namespace || 'default'}-${Math.random()
@@ -197,6 +198,7 @@ async function shutdown() {
   console.log('\n[backend] encerrando...');
   if (healthInterval) clearInterval(healthInterval);
   stopSnapshotter();
+  incidentDetector.stopStuckScanner();
   try {
     if (mqttClient) await new Promise((r) => mqttClient.end(true, {}, r));
     await closePool();

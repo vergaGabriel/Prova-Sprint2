@@ -244,20 +244,84 @@ quando o setor cair abaixo de 90% e voltar a cruzar.
 
 ## Etapa 6 - Incidentes (stuck / flapping)
 
-Detector roda online a cada evento ingerido. Tipos:
+Dois caminhos de deteccao:
 
-- `STUCK_OCCUPIED`: vaga sempre ocupada por >= 8h simuladas
-- `STUCK_FREE`: vaga sempre livre por >= 8h simuladas
-- `FLAPPING`: > 6 trocas em 60 min simulados
+1. **Online (orientado a evento)** em `processar(evt)` — pega `FLAPPING`
+   olhando uma janela rolante de trocas por vaga.
+2. **Scanner periodico** em `scanStuck()` — varre a tabela `spots` a cada
+   `STUCK_SCAN_INTERVAL_MS` procurando vagas sem mudar de estado por mais
+   que `STUCK_THRESHOLD_MS`. Necessario porque um sensor travado nao
+   publica novos eventos, entao o caminho (1) sozinho nao detectaria.
+
+Tipos e thresholds (em **tempo real**, configuraveis via `.env`):
+
+- `STUCK_OCCUPIED`: vaga OCCUPIED ha mais que `STUCK_THRESHOLD_MS`
+- `STUCK_FREE`: vaga FREE ha mais que `STUCK_THRESHOLD_MS`
+- `FLAPPING`: > `FLAPPING_MAX_CHANGES` trocas em `FLAPPING_WINDOW_MS`
+
+### Calibracao dos thresholds
+
+O simulador permite ate **6h sim de permanencia ocupada** (ver
+`escolherTempoPermanencia` em `sensor.js`). Como `last_ts` e tempo real, o
+threshold de STUCK precisa ser **estritamente maior** que esse maximo,
+senao toda vaga com estadia longa vira STUCK por engano.
+
+A regra de ouro e manter os tres valores em sintonia com `TICK_MS`:
+
+| `TICK_MS` | Sim e... | `STUCK_THRESHOLD_MS` | `FLAPPING_WINDOW_MS` |
+|-----------|----------|----------------------|----------------------|
+| 100       | 10x mais rapido | 48000  (= 8h sim) | 6000  (= 60min sim) |
+| 200       | 5x  mais rapido | 96000  (= 8h sim) | 12000 (= 60min sim) |
+| 1000      | tempo real      | 480000 (= 8h sim) | 60000 (= 60min sim) |
+
+Em **todas** essas combinacoes, o spec e respeitado em TEMPO SIMULADO
+(STUCK 8h, FLAPPING > 6 trocas em 60min, dwell maximo 6h) — muda so a
+velocidade do relogio real.
+
+### Tempos de demo (com defaults do `.env` deste repo: TICK_MS=100)
+
+| Falha injetada | Aparece em |
+|---|---|
+| `flapping`         | ~1-2s apos a graca de boot expirar (3s) |
+| `stuck_occupied`   | ~48s apos injecao |
+| `stuck_free`       | ~48s apos injecao |
+
+Vagas saudaveis nao geram incidente (threshold > dwell maximo).
 
 ```bash
 curl http://localhost:4001/api/v1/incidents
 curl 'http://localhost:4001/api/v1/incidents?status=open'
 curl 'http://localhost:4001/api/v1/incidents?type=FLAPPING'
+curl 'http://localhost:4001/api/v1/incidents?type=STUCK_OCCUPIED'
+curl 'http://localhost:4001/api/v1/incidents?type=STUCK_FREE'
 curl http://localhost:4001/api/v1/incidents/stats
 ```
 
-Incidentes sao **fechados automaticamente** quando a vaga volta ao normal.
+Incidentes sao **fechados automaticamente**: STUCK quando a vaga volta a
+mudar de estado (em `processar(evt)`); FLAPPING quando a contagem na
+janela cai pra dentro do limite.
+
+### Como ver os 3 tipos na demo
+
+```bash
+# 1) STUCK_OCCUPIED — trava 1 vaga ocupada e espera ~30s
+curl -X POST http://localhost:4000/faults \
+  -H 'Content-Type: application/json' \
+  -d '{"spotId":"A-07","fault":"stuck_occupied"}'
+
+# 2) STUCK_FREE — idem mas em outra vaga
+curl -X POST http://localhost:4000/faults \
+  -H 'Content-Type: application/json' \
+  -d '{"spotId":"B-12","fault":"stuck_free"}'
+
+# 3) FLAPPING — vai aparecer em ~6-12s (o sim toggle a cada 1-2s)
+curl -X POST http://localhost:4000/faults \
+  -H 'Content-Type: application/json' \
+  -d '{"spotId":"C-03","fault":"flapping"}'
+
+# Confere
+curl 'http://localhost:4001/api/v1/incidents?status=open'
+```
 
 ## Inspecao via MQTT externo (opcional)
 

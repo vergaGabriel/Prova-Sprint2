@@ -47,6 +47,21 @@ module.exports = {
   // Snapshot de setor por minuto (Etapa 3 / sector_snapshots)
   snapshotIntervalMs: parseInt(process.env.SNAPSHOT_INTERVAL_MS || '60000', 10),
 
+  // ===== Incidentes (Etapa 6) =====
+  // Os limiares abaixo sao em TEMPO REAL (ms reais), porque o `ts` do payload
+  // e gerado com `new Date()` no gateway. Para a demo, valores curtos sao mais
+  // praticos; em producao, ajuste pra 8h / 60min via .env.
+  //
+  // STUCK: vaga sem mudar de estado por mais que stuckThresholdMs.
+  stuckThresholdMs: parseInt(process.env.STUCK_THRESHOLD_MS || String(8 * 60 * 60 * 1000), 10),
+  // Intervalo do scanner que varre `spots` em busca de STUCK.
+  stuckScanIntervalMs: parseInt(process.env.STUCK_SCAN_INTERVAL_MS || '5000', 10),
+  // FLAPPING: > flappingMaxChanges trocas em uma janela de flappingWindowMs.
+  flappingWindowMs: parseInt(process.env.FLAPPING_WINDOW_MS || '60000', 10),
+  flappingMaxChanges: parseInt(process.env.FLAPPING_MAX_CHANGES || '6', 10),
+  // Graca apos o boot pra evitar disparos espurios enquanto o sistema estabiliza.
+  incidentStartupGraceMs: parseInt(process.env.INCIDENT_STARTUP_GRACE_MS || '30000', 10),
+
   // Topicos MQTT (montados dinamicamente)
   topics: {
     // ----- publishers (simulador) -----
